@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "SDKVersion": 2,
+  "Name": "Kimai Timer",
+  "Description": "Startet Kimai-Zeiterfassungen per Stream-Deck-Button, zeigt Statusfarben und optional die laufende Zeit an.",
+  "Author": "XCame",
+  "Version": "0.1.0.0",
+  "UUID": "de.xcame.kimai",
+  "Icon": "imgs/plugin-icon",
+  "CodePath": "bin/plugin.js",
+  "Nodejs": {
+    "Version": "24"
+  },
+  "Software": {
+    "MinimumVersion": "7.1"
+  },
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "13"
+    },
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Category": "Kimai Timer",
+  "CategoryIcon": "imgs/plugin-icon",
+  "Actions": [
+    {
+      "Name": "Timer Control",
+      "UUID": "de.xcame.kimai.start-activity",
+      "Icon": "imgs/action-icon",
+      "Controllers": [
+        "Keypad"
+      ],
+      "PropertyInspectorPath": "ui/property-inspector.html",
+      "Tooltip": "Startet eine konfigurierte Kimai-Kombination aus Kunde, Projekt und Tätigkeit.",
+      "SupportedInMultiActions": false,
+      "States": [
+        {
+          "Image": "imgs/action-red",
+          "Title": "Kimai",
+          "ShowTitle": true,
+          "TitleAlignment": "middle",
+          "FontSize": 12
+        }
+      ]
+    }
+  ]
+}

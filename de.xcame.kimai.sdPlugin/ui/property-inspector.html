@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>Kimai Timer Einstellungen</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
+    body { margin: 0; padding: 14px; background: #202020; color: #eee; font-size: 13px; }
+    h1 { font-size: 16px; margin: 0 0 12px; }
+    label { display: block; margin: 10px 0 4px; color: #d7d7d7; }
+    input, select, textarea, button { width: 100%; box-sizing: border-box; border-radius: 6px; border: 1px solid #555; background: #2d2d2d; color: #fff; padding: 7px; font: inherit; }
+    textarea { min-height: 54px; resize: vertical; }
+    button { cursor: pointer; background: #3c3c3c; margin-top: 10px; }
+    button:hover { background: #4a4a4a; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .hint { color: #aaa; font-size: 12px; line-height: 1.35; margin: 6px 0 10px; }
+    .status { margin-top: 10px; min-height: 18px; color: #ccc; }
+    .ok { color: #8bc34a; }
+    .err { color: #ff8a80; }
+    .debug { margin-top: 8px; white-space: pre-wrap; color: #999; font-size: 11px; max-height: 90px; overflow: auto; border-top: 1px solid #444; padding-top: 6px; }
+    .checkbox { display:flex; gap:8px; align-items:center; margin-top:10px; }
+    .checkbox input { width:auto; }
+  </style>
+</head>
+<body>
+  <h1>Kimai Tätigkeit</h1>
+  <p class="hint">Trage zuerst Kimai-URL und API-Token ein. Danach kannst du Kunden, Projekte und Tätigkeiten laden oder IDs manuell setzen.</p>
+
+  <label for="baseUrl">Kimai URL</label>
+  <input id="baseUrl" placeholder="https://kimai.example.com" />
+
+  <label for="token">API Token / Bearer Token</label>
+  <input id="token" type="password" placeholder="Token aus deinem Kimai-Profil" />
+
+  <div class="checkbox"><input id="allowSelfSigned" type="checkbox" /><span>Selbstsigniertes Zertifikat zulassen</span></div>
+  <p class="hint">Nur für lokale Kimai-Instanzen aktivieren. Sicherer ist es, die eigene CA im Betriebssystem zu vertrauen.</p>
+
+  <div class="row">
+    <button id="test">Verbindung testen</button>
+    <button id="load">Listen laden</button>
+  </div>
+
+  <label for="customerSelect">Kunde</label>
+  <select id="customerSelect"><option value="">Optional / aus Projekt</option></select>
+  <input id="customerId" placeholder="Kunden-ID optional" />
+
+  <label for="projectSelect">Projekt</label>
+  <select id="projectSelect"><option value="">Projekt wählen</option></select>
+  <input id="projectId" placeholder="Projekt-ID, z. B. 12" />
+
+  <label for="activitySelect">Tätigkeit</label>
+  <select id="activitySelect"><option value="">Tätigkeit wählen</option></select>
+  <input id="activityId" placeholder="Tätigkeits-ID, z. B. 4" />
+
+  <label for="label">Button-Titel</label>
+  <input id="label" placeholder="z. B. Kunde A · Support" maxlength="40" />
+
+  <div class="checkbox"><input id="showRuntime" type="checkbox" checked /><span>Laufzeit auf Button anzeigen</span></div>
+
+  <label for="runtimeFormat">Laufzeitformat</label>
+  <select id="runtimeFormat">
+    <option value="hhmm">HH:MM</option>
+    <option value="hhmmss">HH:MM:SS</option>
+  </select>
+
+  <label for="runtimeTitleMode">Anzeige auf dem Button</label>
+  <select id="runtimeTitleMode">
+    <option value="label_runtime">Button-Titel + Laufzeit</option>
+    <option value="runtime_only">Nur Laufzeit</option>
+    <option value="project_runtime">Projekt + Laufzeit</option>
+    <option value="activity_runtime">Tätigkeit + Laufzeit</option>
+  </select>
+
+  <div class="checkbox"><input id="hideButtonIcon" type="checkbox" checked /><span>Icon auf Button ausblenden</span></div>
+  <p class="hint">Empfohlen: Icon ausblenden. Dann ist der Button vollständig rot/grau/grün und der Text bleibt besser lesbar.</p>
+
+  <label for="description">Beschreibung</label>
+  <textarea id="description" placeholder="Optionaler Text für den Kimai-Eintrag"></textarea>
+
+  <label for="tags">Tags</label>
+  <input id="tags" placeholder="optional, kommagetrennt" />
+
+  <div class="checkbox"><input id="stopSame" type="checkbox" /><span>Erneuter Klick auf dieselbe laufende Tätigkeit stoppt sie</span></div>
+  <div class="checkbox"><input id="promptDescriptionOnStop" type="checkbox" /><span>Beim Stoppen Beschreibung abfragen</span></div>
+  <p class="hint">Wenn aktiv, öffnet sich beim Stoppen oder Wechseln einer laufenden Tätigkeit ein lokales Eingabefenster. Erst nach „Speichern & stoppen“ wird der Kimai-Eintrag beendet. Strg+Enter löst den Default-Button aus.</p>
+
+  <div class="checkbox"><input id="promptDescriptionEvery15" type="checkbox" /><span>Alle 15 Minuten Beschreibung ergänzen</span></div>
+  <p class="hint">Wenn aktiv, öffnet sich während einer laufenden Tätigkeit alle 15 Minuten ein Fenster. Die bisherige Beschreibung wird nur angezeigt; eingegebener Text wird angehängt. Default ist „Speichern und weiter“ per Strg+Enter.</p>
+  <div class="checkbox"><input id="billable" type="checkbox" checked /><span>Abrechenbar</span></div>
+
+  <div id="status" class="status"></div>
+  <div id="debug" class="debug"></div>
+
+  <script>
+    const ACTION_UUID = 'de.xcame.kimai.start-activity';
+    const fields = ['baseUrl','token','allowSelfSigned','customerId','projectId','activityId','label','showRuntime','runtimeFormat','runtimeTitleMode','hideButtonIcon','description','tags','stopSame','promptDescriptionOnStop','promptDescriptionEvery15','billable'];
+    let websocket = null;
+    let uuid = null;
+    let actionInfo = null;
+
+    function connectElgatoStreamDeckSocket(inPort, inUUID, inRegisterEvent, inInfo, inActionInfo) {
+      uuid = inUUID;
+      try { actionInfo = JSON.parse(inActionInfo || '{}'); } catch { actionInfo = {}; }
+      websocket = new WebSocket('ws://127.0.0.1:' + inPort);
+      websocket.onopen = () => {
+        websocket.send(JSON.stringify({ event: inRegisterEvent, uuid }));
+        loadSettings(actionInfo.payload?.settings || {});
+      };
+      websocket.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        debug('RX ' + msg.event);
+        if (msg.event === 'sendToPropertyInspector') handlePluginMessage(msg.payload || {});
+        if (msg.event === 'didReceiveSettings') loadSettings(msg.payload?.settings || {});
+      };
+    }
+
+    function ctx() { return uuid; }
+    function send(payload) {
+      if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
+      websocket.send(JSON.stringify({ event: 'sendToPlugin', action: ACTION_UUID, context: ctx(), payload }));
+    }
+    function setSettings(settings) {
+      if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
+      websocket.send(JSON.stringify({ event: 'setSettings', context: ctx(), payload: settings }));
+    }
+
+    function readSettings() {
+      const s = {};
+      for (const id of fields) {
+        const el = document.getElementById(id);
+        s[id] = el.type === 'checkbox' ? el.checked : el.value.trim();
+      }
+      s.stopSame = Boolean(s.stopSame);
+      s.promptDescriptionOnStop = Boolean(s.promptDescriptionOnStop);
+      s.promptDescriptionEvery15 = Boolean(s.promptDescriptionEvery15);
+      s.showRuntime = Boolean(s.showRuntime);
+      s.hideButtonIcon = Boolean(s.hideButtonIcon);
+      s.billable = Boolean(s.billable);
+      return s;
+    }
+
+    function loadSettings(settings) {
+      for (const id of fields) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        if (el.type === 'checkbox') {
+          const defaultChecked = id === 'billable' || id === 'showRuntime' || id === 'hideButtonIcon';
+          el.checked = settings[id] !== undefined ? Boolean(settings[id]) : defaultChecked;
+        } else if (id === 'runtimeFormat') {
+          el.value = settings[id] || 'hhmm';
+        } else if (id === 'runtimeTitleMode') {
+          el.value = settings[id] || 'label_runtime';
+        } else {
+          el.value = settings[id] || '';
+        }
+      }
+    }
+
+    let saveTimer = null;
+    let pendingTimer = null;
+    fields.forEach((id) => {
+      const el = document.getElementById(id);
+      const save = () => {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => setSettings(readSettings()), 250);
+      };
+      el.addEventListener('input', save);
+      el.addEventListener('change', save);
+    });
+
+    document.getElementById('test').addEventListener('click', () => {
+      const settings = readSettings(); setSettings(settings); setStatus('Teste Verbindung …'); startPendingTimeout('Keine Antwort vom Plugin nach 15 Sekunden. Prüfe, ob das Plugin lädt und ob die Stream-Deck-Logs einen Fehler zeigen.'); send({ type: 'testConnection', settings });
+    });
+    document.getElementById('load').addEventListener('click', () => {
+      const settings = readSettings(); setSettings(settings); setStatus('Lade Listen …'); startPendingTimeout('Keine Antwort vom Plugin nach 15 Sekunden. Prüfe die Stream-Deck-Logs.'); send({ type: 'loadCatalog', settings });
+    });
+
+    document.getElementById('customerSelect').addEventListener('change', (e) => { document.getElementById('customerId').value = e.target.value; setSettings(readSettings()); });
+    document.getElementById('projectSelect').addEventListener('change', (e) => {
+      const opt = e.target.selectedOptions[0];
+      document.getElementById('projectId').value = e.target.value;
+      if (opt?.dataset.customer) document.getElementById('customerId').value = opt.dataset.customer;
+      setSettings(readSettings());
+    });
+    document.getElementById('activitySelect').addEventListener('change', (e) => { document.getElementById('activityId').value = e.target.value; setSettings(readSettings()); });
+
+    function handlePluginMessage(payload) {
+      clearPendingTimeout();
+      debug('Plugin: ' + (payload.type || 'Nachricht'));
+      if (payload.type === 'catalog') {
+        fillSelect('customerSelect', payload.catalog.customers || [], 'Optional / aus Projekt');
+        fillSelect('projectSelect', payload.catalog.projects || [], 'Projekt wählen', true);
+        fillSelect('activitySelect', payload.catalog.activities || [], 'Tätigkeit wählen');
+        setStatus('Listen geladen.', true);
+      }
+      if (payload.type === 'error') setStatus(payload.message || 'Fehler', false);
+      if (payload.type === 'testResult') setStatus(payload.ok ? 'Verbindung erfolgreich.' : (payload.message || 'Verbindung fehlgeschlagen.'), payload.ok);
+    }
+
+    function fillSelect(id, items, empty, projectMode = false) {
+      const select = document.getElementById(id);
+      const current = select.value;
+      select.innerHTML = `<option value="">${escapeHtml(empty)}</option>`;
+      for (const item of items) {
+        const opt = document.createElement('option');
+        opt.value = item.id;
+        opt.textContent = item.name || item.title || item.comment || ('#' + item.id);
+        if (projectMode) {
+          const customer = idOf(item.customer);
+          if (customer) opt.dataset.customer = customer;
+          if (item.customer?.name) opt.textContent += ' · ' + item.customer.name;
+        }
+        select.appendChild(opt);
+      }
+      select.value = current;
+    }
+
+    function idOf(value) {
+      if (!value) return '';
+      if (typeof value === 'number' || typeof value === 'string') return value;
+      return value.id || '';
+    }
+    function setStatus(text, ok) {
+      const s = document.getElementById('status');
+      s.textContent = text || '';
+      s.className = 'status ' + (ok === true ? 'ok' : ok === false ? 'err' : '');
+    }
+    function startPendingTimeout(message) {
+      clearPendingTimeout();
+      pendingTimer = setTimeout(() => { setStatus(message, false); debug(message); }, 15000);
+    }
+    function clearPendingTimeout() {
+      if (pendingTimer) clearTimeout(pendingTimer);
+      pendingTimer = null;
+    }
+    function debug(text) {
+      const d = document.getElementById('debug');
+      if (!d) return;
+      const time = new Date().toLocaleTimeString();
+      d.textContent = '[' + time + '] ' + text + '\n' + d.textContent;
+    }
+    function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
+  </script>
+</body>
+</html>
